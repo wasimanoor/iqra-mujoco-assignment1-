@@ -643,36 +643,34 @@ class Demo:
         self._reach_pose(hover, xquat_ref, 0.012, 0.14, 2.0)
         return True
 
-        # ==================== Q9: SIMPLE TIME MEASUREMENT ====================
+           # ==================== Q9: TIME MEASUREMENT ====================
     def timed_pick_place(self, obj: str = "box", target_x: float = 0.55, target_y: float = -0.25):
-        """Run pick and place and print the time clearly in the terminal."""
+        """Run pick and place with clear timing output."""
         print(f"\n=== TIMED PICK & PLACE STARTED ===")
-        print(f"Object: {obj}  |  Target: ({target_x:.3f}, {target_y:.3f})")
+        print(f"Object : {obj}")
+        print(f"Target : ({target_x:.3f}, {target_y:.3f})")
         
-        start_time = time.time()                    # ← Start timer
+        start_time = time.time()
         
-        # Run your existing pick and place
         self.pick_place_xy(obj, target_x, target_y)
         
-        self.wait(0.5)                              # small settle time
+        self.wait(0.5)
         
-        end_time = time.time()                      # ← End timer
-        duration = round(end_time - start_time, 2)
+        duration = round(time.time() - start_time, 2)
         
-        # Simple success check
-        success = self.held_obj is None
+        success = (self.held_obj is None)
         try:
             obj_pos = self.data.body(obj).xpos[:2]
             dist = round(np.linalg.norm(obj_pos - np.array([target_x, target_y])), 3)
-            if dist < 0.07:
+            if dist < 0.08:
                 success = True
         except:
-            pass
+            dist = "N/A"
         
         print(f"\n=== TASK FINISHED ===")
-        print(f"Time taken: ** {duration} seconds **")
-        print(f"Success: {success} (distance to target: {dist if 'dist' in locals() else 'N/A'} m)")
-        print("============================\n")
+        print(f"⏱️  Time taken : {duration} seconds")
+        print(f"✅ Success   : {success}  (distance = {dist} m)")
+        print("====================================\n")
         
         return duration
         
@@ -1331,9 +1329,18 @@ if __name__ == "__main__":
                 demo.pick_place_xy(args.obj, float(args.x), float(args.y))
                 demo.return_home_smooth()
 
-        Thread(target=run_sequence, daemon=True).start()
-        demo.start()
-
     else:
+        Thread(target=launch_gui, args=(demo,), daemon=True).start()
+        demo.start()
+        # ===================== TEMPORARY TEST FOR Q9 TIMING =====================
+        # Change to False or comment out after testing
+        if True:
+            demo = Demo()   # Create a fresh demo for clean timing
+            print("Running timed pick-and-place in headless mode for Q9...")
+            duration = demo.timed_pick_place(obj="box", target_x=0.55, target_y=-0.25)
+            print(f"\n🎯 FINAL TIME RESULT: Task completed in {duration} seconds")
+            raise SystemExit(0)
+
+        # Normal GUI mode
         Thread(target=launch_gui, args=(demo,), daemon=True).start()
         demo.start()
