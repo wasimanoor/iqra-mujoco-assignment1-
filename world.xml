@@ -69,7 +69,7 @@
       <geom name="yellow_box_geom" type="box" size="0.03 0.03 0.03" condim="6" material="mat_yellow"/>
     </body>
 
-    <body name="box" pos="0.40 -0.15 0.03">
+    <body name="box" pos="0.55 0.10 0.03">
       <joint name="box_free" type="free"/>
       <geom name="box_geom" type="box" size="0.03 0.03 0.03" condim="6" material="mat_white"/>
     </body>
