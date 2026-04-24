@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pickandplace.py — FULL UPDATED (Robust Re-Perception + Retry + No Flip + Voice waits for task)
 
@@ -35,6 +35,10 @@ from tkinter import ttk, messagebox
 import glfw
 import mujoco
 import numpy as np
+
+import csv
+import os
+import random
 
 from nl_interface import parse_command
 
@@ -642,37 +646,99 @@ class Demo:
         self._move_linear(hover, xquat_ref, duration_s=1.0)
         self._reach_pose(hover, xquat_ref, 0.012, 0.14, 2.0)
         return True
+    
+        # ==================== PART 3: EXPERIMENTS ====================
+    def run_experiments(self, num_trials: int = 8, seed: int = 42) -> None:
+        """Run multiple trials with varying object positions, measure time & success."""
+        print(f"\n=== Starting PART 3 Experiments ({num_trials} trials) ===")
+        
+        random.seed(seed)
+        np.random.seed(seed)
+        
+        results = []
+        obj_name = "box"          # Change if your object is named "red_box", etc.
+        
+        # Create results folder if it doesn't exist
+        os.makedirs("results", exist_ok=True)
+        
+        for trial in range(1, num_trials + 1):
+            print(f"\n--- Trial {trial}/{num_trials} ---")
+            
+            # 1. Reset simulation to clean state
+            self.reset_home()
+            time.sleep(0.2)
+            
+            # 2. Change object position (Q6) - random but reachable
+            # Adjust ranges based on your world.xml (usually around table area)
+            obj_x = round(random.uniform(-0.20, 0.40), 3)   # X range (tune if needed)
+            obj_y = round(random.uniform(-0.45, 0.10), 3)   # Y range (tune if needed)
+            
+            # Set new object position (this works for free-floating bodies like "box")
+            try:
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, obj_name)
+                self.data.xpos[body_id, 0] = obj_x
+                self.data.xpos[body_id, 1] = obj_y
+                self.data.xpos[body_id, 2] = 0.025   # keep on table
+                # Reset velocities
+                for i in range(self.model.nv):
+                    self.data.qvel[i] = 0.0
+                mujoco.mj_forward(self.model, self.data)
+                print(f"Object moved to: x={obj_x:.3f}, y={obj_y:.3f}")
+            except Exception as e:
+                print(f"Warning: Could not move object: {e}")
+                continue
+            
+            # 3. Start timing
+            start_time = time.time()
+            
+            # 4. Run the full pick-and-place task
+            target_x = 0.55
+            target_y = -0.25   # Default target from your GUI (you can randomize this too)
+            
+            success = False
+            try:
+                # Use the existing robust method
+                self.pick_place_xy(obj_name, target_x, target_y)
+                # Give a little extra time for settling
+                self.wait(0.5)
+                
+                # 5. Define success condition (Q10)
+                if self.held_obj is None:   # gripper opened after place
+                    hand = self.data.body("panda_hand")
+                    obj_pos = self.data.body(obj_name).xpos
+                    dist_xy = float(np.linalg.norm(obj_pos[:2] - np.array([target_x, target_y])))
+                    height_ok = abs(obj_pos[2] - 0.025) < 0.04   # placed on table
+                    
+                    success = (dist_xy < 0.06) and height_ok   # ~6cm tolerance
+                    
+                    print(f"Distance to target: {dist_xy:.3f}m | Success: {success}")
+                else:
+                    print("Failed: Object still held or dropped abnormally")
+            except Exception as e:
+                print(f"Error during trial: {e}")
+            
+            # 6. Measure time
+            duration = round(time.time() - start_time, 2)
+            
+            results.append([trial, int(success), duration])
+            print(f"Trial {trial} → Success: {int(success)}, Time: {duration}s")
+            
+            # Optional: small pause between trials
+            time.sleep(0.8)
+        
+        # 7. Save results
+        csv_path = "results/results.csv"
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["trial", "success", "time"])
+            writer.writerows(results)
+        
+        print(f"\n✅ Experiments finished! Results saved to {csv_path}")
+        print("Example table format created.")
+        for row in results:
+            print(row)
 
-           # ==================== Q9: TIME MEASUREMENT ====================
-    def timed_pick_place(self, obj: str = "box", target_x: float = 0.55, target_y: float = -0.25):
-        """Run pick and place with clear timing output."""
-        print(f"\n=== TIMED PICK & PLACE STARTED ===")
-        print(f"Object : {obj}")
-        print(f"Target : ({target_x:.3f}, {target_y:.3f})")
-        
-        start_time = time.time()
-        
-        self.pick_place_xy(obj, target_x, target_y)
-        
-        self.wait(0.5)
-        
-        duration = round(time.time() - start_time, 2)
-        
-        success = (self.held_obj is None)
-        try:
-            obj_pos = self.data.body(obj).xpos[:2]
-            dist = round(np.linalg.norm(obj_pos - np.array([target_x, target_y])), 3)
-            if dist < 0.08:
-                success = True
-        except:
-            dist = "N/A"
-        
-        print(f"\n=== TASK FINISHED ===")
-        print(f"⏱️  Time taken : {duration} seconds")
-        print(f"✅ Success   : {success}  (distance = {dist} m)")
-        print("====================================\n")
-        
-        return duration
+    
         
     def place_on_top_of_body(self, base_name: str) -> bool:
         """Place on top of base (stack). Returns False if drop detected."""
@@ -1332,13 +1398,10 @@ if __name__ == "__main__":
     else:
         Thread(target=launch_gui, args=(demo,), daemon=True).start()
         demo.start()
-        # ===================== TEMPORARY TEST FOR Q9 TIMING =====================
-        # Change to False or comment out after testing
-        if True:
-            demo = Demo()   # Create a fresh demo for clean timing
-            print("Running timed pick-and-place in headless mode for Q9...")
-            duration = demo.timed_pick_place(obj="box", target_x=0.55, target_y=-0.25)
-            print(f"\n🎯 FINAL TIME RESULT: Task completed in {duration} seconds")
+            # For quick testing - add this temporarily
+        if True:  # Change to False after testing
+            demo = Demo()
+            demo.run_experiments(num_trials=8)
             raise SystemExit(0)
 
         # Normal GUI mode
