@@ -66,8 +66,8 @@ class Demo:
     hold_hz = 500  # mj_step rate in hold loop
 
     # adaptive speed (seconds): duration = max(min_dur, dist / max_speed)
-    max_speed_xy = 0.30  # m/s
-    max_speed_z = 0.25   # m/s
+    max_speed_xy = 0.60  # m/s
+    max_speed_z = 0.50   # m/s
     min_move_dur = 0.25  # s
     max_move_dur = 2.50  # s
 
