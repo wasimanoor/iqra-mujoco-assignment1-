@@ -746,27 +746,28 @@ class Demo:
             if self.pick_only(target_hint=obj, attempts=2):
                 self.place_xy(x, y)
 
-def pick_place_to_site(self, obj: str, target_site: str) -> None:
+    def pick_place_xy(self, obj: str, x: float, y: float):
 
-    start_time = time.time()   # ⏱ start timing
+        start_time = time.time()
 
-    if not self.pick_only(target_hint=obj):
-        success = 0
+        if not self.pick_only(target_hint=obj):
+            success = 0
+            end_time = time.time()
+            total_time = end_time - start_time
+            print("Time:", total_time)
+            print("Success:", success)
+            return
+
+        ok_place = self.place_xy(float(x), float(y))
+
+        success = 1 if ok_place else 0
+
         end_time = time.time()
         total_time = end_time - start_time
+
         print("Time:", total_time)
         print("Success:", success)
-        return
 
-    ok_place = self.place_xy(float(x), float(y))
-
-    success = 1 if ok_place else 0
-
-    end_time = time.time()   # ⏱ end timing
-    total_time = end_time - start_time
-
-    print("Time:", total_time)
-    print("Success:", success)
 
     def stack(self, obj: str, base: str) -> None:
         if not self.pick_only(target_hint=obj):
